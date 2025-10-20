@@ -1,0 +1,10 @@
+# Reduce Docker build context size
+node_modules
+npm-debug.log
+.DS_Store
+.git
+.gitignore
+.vscode
+coverage
+dist
+# Keep dist excluded; we build inside the image

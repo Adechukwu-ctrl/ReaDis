@@ -1,0 +1,98 @@
+name: Release Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type"
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      prefix:
+        description: "Tag prefix (e.g., v)"
+        required: false
+        default: "v"
+        type: string
+      prerelease:
+        description: "Optional prerelease suffix (e.g., -rc.1)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Configure Git user
+        run: |
+          git config user.name "${GITHUB_ACTOR}"
+          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Calculate next tag
+        id: calc
+        shell: bash
+        run: |
+          set -euo pipefail
+          PREFIX="${{ inputs.prefix }}"
+          BUMP="${{ inputs.bump }}"
+          PRERELEASE="${{ inputs.prerelease }}"
+          LATEST_TAG=$(git tag --list "${PREFIX}*" --sort=-v:refname | head -n1 || true)
+          if [ -z "$LATEST_TAG" ]; then
+            LATEST_VERSION="0.0.0"
+          else
+            LATEST_VERSION="${LATEST_TAG#${PREFIX}}"
+            LATEST_VERSION="${LATEST_VERSION%%-*}"
+          fi
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${LATEST_VERSION:-0.0.0}"
+          MAJOR=${MAJOR:-0}; MINOR=${MINOR:-0}; PATCH=${PATCH:-0}
+          case "$BUMP" in
+            patch) PATCH=$((PATCH + 1));;
+            minor) MINOR=$((MINOR + 1)); PATCH=0;;
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0;;
+          esac
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          if [ -n "$PRERELEASE" ]; then
+            NEW_VERSION_FULL="${NEW_VERSION}${PRERELEASE}"
+          else
+            NEW_VERSION_FULL="${NEW_VERSION}"
+          fi
+          NEW_TAG="${PREFIX}${NEW_VERSION_FULL}"
+          echo "new_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "new_version_full=$NEW_VERSION_FULL" >> "$GITHUB_OUTPUT"
+          echo "Latest tag: ${LATEST_TAG:-none}"
+          echo "New tag: $NEW_TAG"
+      - name: Update package.json version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.calc.outputs.new_version_full }}"
+          echo "Setting package.json version to $VERSION"
+          npm version "$VERSION" --no-git-tag-version
+          git add package.json package-lock.json || true
+          git commit -m "chore: bump version to $VERSION" || echo "No changes to commit"
+      - name: Push commit
+        shell: bash
+        run: |
+          git push origin HEAD
+      - name: Create and push tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          NEW_TAG="${{ steps.calc.outputs.new_tag }}"
+          git tag -a "$NEW_TAG" -m "release $NEW_TAG"
+          git push origin "$NEW_TAG"
