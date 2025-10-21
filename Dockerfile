@@ -6,7 +6,14 @@ WORKDIR /app
 
 # Install deps first for better caching
 COPY package*.json ./
-RUN npm ci
+# Optional registry and resilient npm settings to avoid network issues
+ARG NPM_REGISTRY
+RUN set -eux; \
+    if [ -n "$NPM_REGISTRY" ]; then npm config set registry "$NPM_REGISTRY"; fi; \
+    npm config set fetch-retries 5; \
+    npm config set fetch-retry-factor 2; \
+    npm config set fetch-retry-maxtimeout 120000; \
+    npm ci --legacy-peer-deps
 
 # Copy source and build
 COPY . .
