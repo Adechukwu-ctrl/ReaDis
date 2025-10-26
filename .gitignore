@@ -1,0 +1,32 @@
+# Global ignores for the repository
+
+# Node
+node_modules/
+**/node_modules/
+.pnpm-store/
+.pnp.cjs
+.pnp.js
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+.next/
+.cache/
+
+# Env files (ensure secrets are not committed)
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

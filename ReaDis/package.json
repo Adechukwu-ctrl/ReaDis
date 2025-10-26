@@ -1,0 +1,16 @@
+{
+  "dependencies": {
+
+  },
+  "scripts": {
+    "dev": "pnpm -w --filter ./ReaDis dev",
+    "dev:backend": "pnpm -w --filter ./temp-extraction/backend dev",
+    "build": "pnpm -w --filter ./ReaDis build",
+    "preview": "pnpm -w --filter ./ReaDis preview"
+  },
+  "pnpm": {
+    "overrides": {
+      "pdfjs-dist": "5.4.296"
+    }
+  }
+}
