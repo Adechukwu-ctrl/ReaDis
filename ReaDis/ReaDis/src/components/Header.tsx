@@ -21,9 +21,9 @@ export const Header: React.FC = () => {
             <div className="text-center">
               <div className="flex items-center space-x-1 text-lg font-semibold">
                 <Zap className="h-5 w-5" />
-                <span>AI-Powered</span>
+                
               </div>
-              <p className="text-sm text-brand-100">Smart text extraction</p>
+              
             </div>
           </div>
         </div>
@@ -31,3 +31,4 @@ export const Header: React.FC = () => {
     </header>
   );
 };
+
