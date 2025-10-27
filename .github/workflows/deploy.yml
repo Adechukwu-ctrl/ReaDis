@@ -26,23 +26,23 @@ jobs:
         with:
           node-version: 18
           cache: 'npm'
-          cache-dependency-path: ReaDis/ReaDis/ReaDis/package-lock.json
+          cache-dependency-path: ReaDis/ReaDis/package-lock.json
 
       - name: Install dependencies
         run: npm ci
-        working-directory: ReaDis/ReaDis/ReaDis
+        working-directory: ReaDis/ReaDis
 
       - name: Build
         run: |
           # For project pages: /<repo>/; for user/organization pages: /
           VITE_PUBLIC_BASE=/${{ github.event.repository.name }}/ npm run build
           cp dist/index.html dist/404.html
-        working-directory: ReaDis/ReaDis/ReaDis
+        working-directory: ReaDis/ReaDis
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ReaDis/ReaDis/ReaDis/dist
+          path: ReaDis/ReaDis/dist
 
   deploy:
     needs: build
