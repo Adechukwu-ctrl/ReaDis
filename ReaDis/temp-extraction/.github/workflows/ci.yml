@@ -1,18 +1,22 @@
 
-name: CI
+name: temp-extraction CI
 
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'ReaDis/temp-extraction/**'
   pull_request:
     branches: [ main ]
+    paths:
+      - 'ReaDis/temp-extraction/**'
 
 jobs:
   backend-tests:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: backend
+        working-directory: ReaDis/temp-extraction/backend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
