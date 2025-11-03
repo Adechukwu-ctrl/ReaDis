@@ -72,9 +72,12 @@ const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ onTextExtracted }) => {
       
       if (!context) return;
 
+      const dpr = window.devicePixelRatio || 1;
       const viewport = page.getViewport({ scale, rotation });
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
+      canvas.height = Math.floor(viewport.height * dpr);
+      canvas.width = Math.floor(viewport.width * dpr);
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.scale(dpr, dpr);
 
       const renderContext = {
         canvasContext: context,
@@ -174,10 +177,89 @@ const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ onTextExtracted }) => {
     }
   };
 
-  const zoomIn = () => setScale(prev => Math.min(prev + 0.25, 3.0));
-  const zoomOut = () => setScale(prev => Math.max(prev - 0.25, 0.5));
+    const clampScale = (s: number) => Math.min(Math.max(s, 0.5), 4.0);
+  const zoomIn = () => setScale(prev => clampScale(prev * 1.2));
+  const zoomOut = () => setScale(prev => clampScale(prev / 1.2));
   const rotate = () => setRotation(prev => (prev + 90) % 360);
-  const toggleFullscreen = () => setIsFullscreen(prev => !prev);
+  
+
+  // Fit-to-width and fit-to-page helpers
+  const fitWidth = useCallback(async () => {
+    if (!pdfDocument || !containerRef.current) return;
+    const page = await pdfDocument.getPage(currentPage);
+    const viewport = page.getViewport({ scale: 1, rotation });
+    const containerWidth = containerRef.current!.clientWidth - 24; // account for padding/scrollbar
+    const newScale = containerWidth / viewport.width;
+    setScale(clampScale(newScale));
+  }, [pdfDocument, currentPage, rotation]);
+
+  const fitPage = useCallback(async () => {
+    if (!pdfDocument || !containerRef.current) return;
+    const page = await pdfDocument.getPage(currentPage);
+    const viewport = page.getViewport({ scale: 1, rotation });
+    const container = containerRef.current!;
+    const containerWidth = container.clientWidth - 24;
+    const containerHeight = (isFullscreen ? window.innerHeight : container.clientHeight) - 24;
+    const scaleX = containerWidth / viewport.width;
+    const scaleY = containerHeight / viewport.height;
+    const newScale = Math.min(scaleX, scaleY);
+    setScale(clampScale(newScale));
+  }, [pdfDocument, currentPage, rotation, isFullscreen]);
+
+  // Ctrl/Meta + wheel zoom with scroll position preservation
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!pdfDocument) return;
+      if (!(e.ctrlKey || e.metaKey)) return; // avoid hijacking normal scroll
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      const prevScale = scale;
+      const newScale = clampScale(prevScale * factor);
+      const prevLeftRatio = el.scrollLeft / Math.max(1, el.scrollWidth - el.clientWidth);
+      const prevTopRatio = el.scrollTop / Math.max(1, el.scrollHeight - el.clientHeight);
+      setScale(newScale);
+      Promise.resolve().then(() => {
+        el.scrollLeft = prevLeftRatio * Math.max(1, el.scrollWidth - el.clientWidth);
+        el.scrollTop = prevTopRatio * Math.max(1, el.scrollHeight - el.clientHeight);
+      });
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel as any);
+  }, [pdfDocument, scale]);
+
+  // Keyboard shortcuts: + (zoom in), - (zoom out), 0 (reset), f (fit width)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!pdfDocument) return;
+
+      const active = document.activeElement as HTMLElement | null;
+      const isTyping = active && (
+        active.tagName === 'INPUT' ||
+        active.tagName === 'TEXTAREA' ||
+        (active as HTMLElement).isContentEditable
+      );
+      if (isTyping) return;
+
+      const key = e.key;
+      if (key === '+' || key === '=') {
+        e.preventDefault();
+        zoomIn();
+      } else if (key === '-') {
+        e.preventDefault();
+        zoomOut();
+      } else if (key === '0') {
+        e.preventDefault();
+        setScale(1.0);
+      } else if (key.toLowerCase() === 'f') {
+        e.preventDefault();
+        fitWidth();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [pdfDocument, zoomIn, zoomOut, fitWidth]);
 
   // Re-render page when dependencies change
   useEffect(() => {
@@ -317,13 +399,27 @@ const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ onTextExtracted }) => {
                   {Math.round(scale * 100)}%
                 </span>
                 
-                <button
+                                <button
                   onClick={zoomIn}
                   className="p-2 bg-gray-600 text-white rounded hover:bg-gray-700"
                 >
                   <ZoomIn className="w-4 h-4" />
                 </button>
-                
+
+                <button
+                  onClick={fitWidth}
+                  className="px-3 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm"
+                >
+                  Fit Width
+                </button>
+
+                <button
+                  onClick={fitPage}
+                  className="px-3 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm"
+                >
+                  Fit Page
+                </button>
+
                 <button
                   onClick={rotate}
                   className="p-2 bg-gray-600 text-white rounded hover:bg-gray-700"
@@ -409,3 +505,4 @@ const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ onTextExtracted }) => {
 };
 
 export default PdfJsViewer;
+
